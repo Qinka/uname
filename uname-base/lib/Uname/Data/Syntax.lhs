@@ -8,6 +8,7 @@ module Uname.Data.Syntax
        , Prog(..)
        ) where
 
+import Text.Parsec.Pos
 \end{code}
 
 \codesection{data structs}
@@ -38,6 +39,7 @@ for statment
 \begin{code}
 data Stmt = IsS Exp Exp
           | FRDS Exp Exp Exp Exp Exp
+          | LanguageExtensionS String
           deriving (Eq,Show)
 \end{code}
 

@@ -16,6 +16,7 @@ module Uname.Data.LanguageExtension
 import Text.Parsec
 
 import Data.Char (toLower,toUpper)
+import Data.Maybe
 \end{code}
 
 \codesection{Case Sensitive}
@@ -29,7 +30,12 @@ class IsCaseSensitive u  where
   isCaseSensitive  :: u -> Bool
   isCaseSensitiveM :: (Monad m,CaseSensitive s) => ParsecT s u m Bool
   isCaseSensitiveM = isCaseSensitive <$> getState
-  {-# MINIMAL isCaseSensitive #-}
+  transCaseSensitive :: u -> Maybe (u -> u)
+  transCaseInsensitive :: u -> Maybe (u -> u)
+  transCaseM :: (Monad m,CaseSensitive s) => Bool -> ParsecT s u m ()
+  transCaseM True  = (fromMaybe id.transCaseSensitive)   <$> getState >>= modifyState
+  transCaseM False = (fromMaybe id.transCaseInsensitive) <$> getState >>= modifyState
+  {-# MINIMAL isCaseSensitive, transCaseSensitive, transCaseInsensitive #-}
 \end{code}
 
 \typeclass{CaseSensitive}

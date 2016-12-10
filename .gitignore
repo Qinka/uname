@@ -21,3 +21,5 @@ cabal.project.local
 .ignore
 
 *~
+
+.DS_Store

@@ -69,8 +69,13 @@ expItem = do
     f 0 0 = 0
     f x y = y ^^ x
 
+floatLit' :: Parser Double
+floatLit' = sign >>= \x -> x <$> choice [try bypartL, intOL, pointOL,floatFailed]
+
 floatLit :: Parser Double
-floatLit = sign >>= \x -> x <$> choice [try bypartL, intOL, pointOL,floatFailed]
+floatLit = do
+  ls <- many1 $ oneOf $ ['0'..'9'] ++ "eE-+."
+  return $ read ls
 
 sign :: Num a => Parser (a -> a)
 sign = do

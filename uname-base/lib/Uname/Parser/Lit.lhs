@@ -7,6 +7,7 @@ module Uname.Parser.Lit
        ) where
 
 import Uname.Data.LanguageExtension
+import Uname.Data.ParserState
 import Uname.Data.Syntax
 import Uname.Parser.Char
 
@@ -21,18 +22,18 @@ fDtR :: Double -> Rational
 fDtR = toRational
 fItR :: Int -> Rational
 fItR = toRational
-intOL :: (Stream s m Char,IsCaseSensitive u,CaseSensitive s) => ParsecT s u m Rational
+intOL :: UnameParser s u m => ParsecT s u m Rational
 intOL = do
   f <- (fItR.read) <$> many1 digit
   option '.' $ char '.'
   e <- option id expItem
   return $ e f
-pointOL :: (Stream s m Char,IsCaseSensitive u,CaseSensitive s) => ParsecT s u m Rational
+pointOL :: UnameParser s u m => ParsecT s u m Rational
 pointOL = do
   f <- (fDtR.read.("0." ++)) <$> (char '.' *> many1 digit)
   e <- option id expItem
   return $ e f
-bypartL :: (Stream s m Char,IsCaseSensitive u,CaseSensitive s)
+bypartL :: UnameParser s u m
         => ParsecT s u m Rational
 bypartL = do
   l <- many1 digit
@@ -45,7 +46,7 @@ bypartL = do
 
 for power
 \begin{code}
-expItem :: (Stream s m Char,IsCaseSensitive u,CaseSensitive s,Fractional a,Eq a)
+expItem :: (UnameParser s u m,Fractional a,Eq a)
         => ParsecT s u m (a -> a)
 expItem = do
   char 'E' <|> char 'e'
@@ -59,8 +60,7 @@ expItem = do
 
 for signed
 \begin{code}
-sign :: (Stream s m Char,IsCaseSensitive u,CaseSensitive s,Num a)
-     => ParsecT s u m (a -> a)
+sign :: (UnameParser s u m,Num a) => ParsecT s u m (a -> a)
 sign = do
   x <- option '+' $ oneOf "+-"
   return $ \a -> case x of
@@ -70,12 +70,10 @@ sign = do
 
 for parsing
 \begin{code}
-parsingRealL :: (Stream s m Char,IsCaseSensitive u,CaseSensitive s)
-             => ParsecT s u m Lit
+parsingRealL :: UnameParser s u m => ParsecT s u m Lit
 parsingRealL = RealL <$> floatLit
   where floatLit = sign >>= \x -> x <$> choice [try bypartL,intOL,pointOL]
           <?> "a real number liking 1, .1, 1.1e2, etc"
-parsingLit ::  (Stream s m Char,IsCaseSensitive u,CaseSensitive s)
-           => ParsecT s u m Lit
+parsingLit ::  UnameParser s u m => ParsecT s u m Lit
 parsingLit = parsingRealL
 \end{code}

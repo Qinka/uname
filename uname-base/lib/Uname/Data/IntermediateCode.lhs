@@ -6,6 +6,7 @@ module Uname.Data.IntermediateCode
        , Setting(..)
        , Point(..)
        , Color(..)
+       , showInput
        ) where
 
 import Uname.Labels
@@ -34,6 +35,29 @@ data Color = RGB (Double,Double,Double)
            | HSV (Double,Double,Double)
            deriving (Show,Eq)                   
 \end{code}
+
+\begin{code}
+showInput :: Input -> String
+showInput (SettingI s) = showSetting s
+showInput (PointI p) = showPoint p
+showInput FrameSplit = "frame\n"
+showInput InvailedStmt = ""
+showSetting :: Setting -> String
+showSetting (Scale (x,y)) = "scale " ++ show x ++ " " ++ show y ++ "\n"
+showSetting (Rotate x) = "rotate " ++ show x ++ "\n"
+showSetting (Translate (x,y)) = "translate " ++ show x ++ " " ++ show y ++ "\n"
+showPoint :: Point -> String
+showPoint (Point (x,y) str ds) = show x ++ " " ++ show y ++ " " ++ str ++ " " ++ (unwords $ map show ds) ++ "\n"
+\end{code}
+showInputB :: Input -> ByteString
+showInputB (SettingI s) = showSettingB s
+showInputB (Point p) = showPointB p
+showInputB FrameSplit = "frame\n"
+showInputB InvailedStmt = ""
+showSettingB :: Settings -> ByteString
+showSettingB (Scale (x,y)) = concat ["scale ",  
+\end{ce}
+
 
 \begin{code}
 instance HasLabel Point "color" (Maybe Color) where

@@ -14,6 +14,8 @@ module Uname.Parser.Expr
        ) where
 
 import Uname.Data.LanguageExtension
+import Uname.Data.ParserState
+import Uname.Data.SymbolTable
 import Uname.Data.Syntax
 import Uname.Parser.Char
 import Uname.Parser.Lit
@@ -35,25 +37,33 @@ And the "Expr'" means the next level of operations, and for the top level,the op
 
 for LitE
 \begin{code}
-parsingLitE :: (Stream s m Char,IsCaseSensitive u,CaseSensitive s) => ParsecT s u m Exp
+parsingLitE :: UnameParser s u m => ParsecT s u m Exp
 parsingLitE = LitE <$> parsingLit
 \end{code}
 
 for VarE
 \begin{code}
-getNameVE :: (Stream s m Char,IsCaseSensitive u,CaseSensitive s) => ParsecT s u m String
-getNameVE = do
+getNameVE :: UnameParser s u m => Bool -> ParsecT s u m (Bool,String)
+getNameVE b = do
+  st <- symbolTable <$> getState
   f <- oneOf $ ['a'..'z'] ++ ['A'..'Z'] ++ ['\'','_']
   rst <- many.oneOf $ ['0'..'9'] ++ ['a'..'z'] ++ ['A'..'Z'] ++ ['\'','_']
-  return $ f:rst
-
-parsingVarE :: (Stream s m Char,IsCaseSensitive u,CaseSensitive s) => ParsecT s u m Exp
-parsingVarE = VarE <$> getNameVE <?> "a vailed name of variable"
+  let b' =  b || ((f:rst) `member` st)
+  return (b', f:rst)
+  
+parsingVarE :: UnameParser s u m => Bool -> ParsecT s u m Exp
+parsingVarE b = do
+  v <- getNameVE b
+  case v of
+    (_,"pi") -> return $ LitE $ RealL $ toRational   pi
+    (_,"e" ) -> return $ LitE $ RealL $ toRational $ exp 1
+    (True ,x) -> return (VarE x) <?> "a vailed name of variable"
+    (False,x) -> unexpected $ "Unexpected symbol: " ++ x
 \end{code}
 
 for IsE
 \begin{code}
-parsingTupleE :: (Stream s m Char,IsCaseSensitive u,CaseSensitive s) => ParsecT s u m Exp
+parsingTupleE :: UnameParser s u m => ParsecT s u m Exp
 parsingTupleE = let p = parsingExpr `sepBy` (spaces >>char ','>>spaces)
                     t = char '(' *> p <* char ')'
                 in TupleE <$> t
@@ -61,9 +71,9 @@ parsingTupleE = let p = parsingExpr `sepBy` (spaces >>char ','>>spaces)
 
 for level 4 (about add and sub)
 \begin{code}
-parsingL4 :: (Stream s m Char, IsCaseSensitive u, CaseSensitive s) => ParsecT s u m Exp
-parsingL4 = try (parsingL3 >>= parsingL4') <|> try parsingL3  <?> "level4"
-parsingL4' :: (Stream s m Char,IsCaseSensitive u,CaseSensitive s) => Exp -> ParsecT s u m Exp
+parsingL4 :: UnameParser s u m => ParsecT s u m Exp
+parsingL4 = try (parsingL3 >>= parsingL4') <|> parsingL3
+parsingL4' :: UnameParser s u m => Exp -> ParsecT s u m Exp
 parsingL4' e1 = do
   try spaces
   opt <- oneOf "+-"
@@ -77,9 +87,9 @@ parsingL4' e1 = do
 
 for level 3 (about multiplication and division)
 \begin{code}
-parsingL3 :: (Stream s m Char, IsCaseSensitive u, CaseSensitive s) => ParsecT s u m Exp
-parsingL3 = try (parsingL2 >>= parsingL3') <|> try parsingL2 <?> "level3"
-parsingL3' ::  (Stream s m Char, IsCaseSensitive u, CaseSensitive s) => Exp -> ParsecT s u m Exp
+parsingL3 :: UnameParser s u m => ParsecT s u m Exp
+parsingL3 = try (parsingL2 >>= parsingL3') <|> parsingL2
+parsingL3' ::  UnameParser s u m => Exp -> ParsecT s u m Exp
 parsingL3' e1 = do
   try spaces
   opt <- oneOf "*/"
@@ -93,9 +103,9 @@ parsingL3' e1 = do
 
 for level 2 (about positive adn negative)
 \begin{code}
-parsingL2 :: (Stream s m Char, IsCaseSensitive u, CaseSensitive s) => ParsecT s u m Exp
+parsingL2 :: UnameParser s u m => ParsecT s u m Exp
 parsingL2 = try parsingL2' <|> parsingL1
-parsingL2' :: (Stream s m Char, IsCaseSensitive u, CaseSensitive s) => ParsecT s u m Exp
+parsingL2' :: UnameParser s u m => ParsecT s u m Exp
 parsingL2' = do
   try spaces
   opt <- oneOf "+-"
@@ -108,9 +118,9 @@ parsingL2' = do
 
 for level 1 (about power)
 \begin{code}
-parsingL1 :: (Stream s m Char, IsCaseSensitive u, CaseSensitive s) => ParsecT s u m Exp
+parsingL1 :: UnameParser s u m => ParsecT s u m Exp
 parsingL1 = try parsingL1' <|> parsingL0
-parsingL1' :: (Stream s m Char, IsCaseSensitive u, CaseSensitive s) => ParsecT s u m Exp
+parsingL1' :: UnameParser s u m => ParsecT s u m Exp
 parsingL1' = do
   e1 <- parsingL0
   try spaces
@@ -122,18 +132,21 @@ parsingL1' = do
 
 for level0 (about id, lit,comment, and func)
 \begin{code}
-parsingL0 :: (Stream s m Char, IsCaseSensitive u, CaseSensitive s) => ParsecT s u m Exp
-parsingL0 = try parsingFuncE <|> try parsingTupleE <|> try parsingLitE <|> try parsingVarE  <?> "how??"
-parsingFuncE :: (Stream s m Char, IsCaseSensitive u, CaseSensitive s) => ParsecT s u m Exp
+parsingL0 :: UnameParser s u m => ParsecT s u m Exp
+parsingL0 = try parsingFuncE <|> try parsingTupleE <|> try parsingLitE <|> parsingVarE False
+parsingFuncE :: UnameParser s u m => ParsecT s u m Exp
 parsingFuncE = do
   try spaces
-  funName <- try (string "sin") <|> try (string "cos") <|> (string "ln")
+  funName <- mkFunNames ["sin","cos","tan","asin","acos","atan","sinh","cosh","tanh","asinh","acosh","atanh","sqrt","ln","exp","log","abs"]
+    --} try (string "sin") <|> try (string "cos") <|> (string "ln")
   try spaces
   e <- parsingExpr
   return $ FuncE funName e
+  where mkFunNames [] = error "how ?!"
+        mkFunNames (x:xs) = foldl (<|>) (string x) $ map (try.string) xs
 \end{code}
 
 \begin{code}
-parsingExpr :: (Stream s m Char,IsCaseSensitive u,CaseSensitive s) => ParsecT s u m Exp
+parsingExpr :: UnameParser s u m => ParsecT s u m Exp
 parsingExpr = parsingL4
 \end{code}
