@@ -137,13 +137,16 @@ parsingL0 = try parsingFuncE <|> try parsingTupleE <|> try parsingLitE <|> parsi
 parsingFuncE :: UnameParser s u m => ParsecT s u m Exp
 parsingFuncE = do
   try spaces
-  funName <- mkFunNames ["sin","cos","tan","asin","acos","atan","sinh","cosh","tanh","asinh","acosh","atanh","sqrt","ln","exp","log","abs"]
-    --} try (string "sin") <|> try (string "cos") <|> (string "ln")
+  funName <- many1 letter'
   try spaces
-  e <- parsingExpr
-  return $ FuncE funName e
-  where mkFunNames [] = error "how ?!"
-        mkFunNames (x:xs) = foldl (<|>) (string x) $ map (try.string) xs
+  if funName `elem` funcList
+    then do
+    try spaces
+    e <- parsingExpr
+    return $ FuncE funName e
+    else do
+    parserFail $ "excepted: " ++ unwords funcList
+  where funcList = ["sin","cos","tan","asin","acos","atan","sinh","cosh","tanh","asinh","acosh","atanh","sqrt","ln","exp","log","abs"]
 \end{code}
 
 \begin{code}
